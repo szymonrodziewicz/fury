@@ -33,7 +33,6 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import mercator._
 import scala.collection.JavaConverters._
 
-
 object Zipper {
 
   def pack(root: Path, destination: Path, creator: ParallelScatterZipCreator): Try[Path] = {

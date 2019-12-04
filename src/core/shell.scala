@@ -167,9 +167,9 @@ case class Shell(environment: Environment) {
     manifest.write(zos)
     zos.closeArchiveEntry()
     
-    val zipCreator = new ParallelScatterZipCreator
-    inputs.foreach(Zipper.pack(_, dest, zipCreator))
-    zipCreator.writeTo(zos)
+    val creator = new ParallelScatterZipCreator
+    inputs.foreach(Zipper.pack(_, dest, creator))
+    creator.writeTo(zos)
     zos.close()
   }
 
