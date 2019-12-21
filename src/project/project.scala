@@ -74,7 +74,6 @@ object ProjectCli {
     import ctx._
     for {
       cli            <- cli.hint(ProjectNameArg)
-      cli            <- cli.hint(LicenseArg, License.standardLicenses)
       dSchema        <- layer.schemas.findBy(optSchemaId.getOrElse(layer.main))
 
       cli            <- cli.hint(DefaultCompilerArg, ModuleRef.JavaRef :: dSchema.compilerRefs(
@@ -84,8 +83,7 @@ object ProjectCli {
       compilerId     <- ~call(DefaultCompilerArg).toOption
       optCompilerRef <- compilerId.map(ModuleRef.parseFull(_, true)).to[List].sequence.map(_.headOption)
       projectId      <- call(ProjectNameArg)
-      license        <- Success(call(LicenseArg).toOption.getOrElse(License.unknown))
-      project        <- ~Project(projectId, license = license, compiler = optCompilerRef)
+      project        <- ~Project(projectId, compiler = optCompilerRef)
 
       layer          <- Lenses.updateSchemas(optSchemaId, layer, true)(Lenses.layer.projects(_))(
                             _.modify(_)((_: SortedSet[Project]) + project))
@@ -131,7 +129,6 @@ object ProjectCli {
       
       cli            <- cli.hint(ForceArg)
       projectId      <- ~cli.peek(ProjectArg).orElse(dSchema.flatMap(_.main))
-      cli            <- cli.hint(LicenseArg, License.standardLicenses)
       cli            <- cli.hint(ProjectNameArg, projectId)
       call           <- cli.call()
       projectId      <- projectId.ascribe(UnspecifiedProject())
@@ -139,8 +136,6 @@ object ProjectCli {
       project        <- schema.projects.findBy(projectId)
       force          <- ~call(ForceArg).isSuccess
       focus          <- ~Lenses.focus(optSchemaId, force)
-      licenseArg     <- ~call(LicenseArg).toOption
-      layer          <- focus(layer, _.lens(_.projects(on(project.id)).license)) = licenseArg
       descriptionArg <- ~call(DescriptionArg).toOption
       layer          <- focus(layer, _.lens(_.projects(on(project.id)).description)) = descriptionArg
       compilerArg    <- ~call(DefaultCompilerArg).toOption.flatMap(ModuleRef.parseFull(_, true).toOption)

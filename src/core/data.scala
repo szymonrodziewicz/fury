@@ -866,7 +866,6 @@ object Project {
 case class Project(id: ProjectId,
                    modules: SortedSet[Module] = TreeSet(),
                    main: Option[ModuleId] = None,
-                   license: LicenseId = License.unknown,
                    description: String = "",
                    compiler: Option[ModuleRef] = None) {
 
