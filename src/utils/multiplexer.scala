@@ -33,23 +33,22 @@ final class Multiplexer[K, V](keys: List[K]) {
       val snapshot = state.to[List]
       // FIXME: This could be written more efficiently with a builder
       val changes = snapshot.zip(lastSnapshot).flatMap {
-        case (current, last) =>
-          current.take(current.length - last.length).reverse
+        case (current, last) => current.take(current.length - last.length).reverse
       }
-      if(finished && changes.isEmpty) {
-        tick.to[Iterator]
-      } else {
+      if(finished && changes.isEmpty) tick.to[Iterator]
+      else {
         val time = System.currentTimeMillis - t0
         if(time < interval) Thread.sleep(interval - time)
         changes.to[Iterator] ++ (if(show) tick.to[Iterator] else Iterator()) ++ stream(snapshot)
       }
     }
+
     stream(state.to[List])
   }
 
   /** This method should only ever be called from one thread for any given reference, to
     *  guarantee safe concurrent access. */
-  def update(key: K, value: V): Unit = state(refs(key)) = value :: state(refs(key))
+  def send(key: K, value: V): Unit = state(refs(key)) = value :: state(refs(key))
 
   /** This method should only ever be called from one thread for any given reference, to
     *  guarantee safe concurrent access. */

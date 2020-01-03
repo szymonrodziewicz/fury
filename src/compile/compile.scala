@@ -250,10 +250,10 @@ class FuryBuildClient(multiplexer: Multiplexer[ModuleRef, CompileEvent], compila
     targetId: TargetId, layout: Layout) extends BuildClient {
 
   override def onBuildShowMessage(params: ShowMessageParams): Unit =
-    multiplexer(targetId.ref) = Print(targetId.ref, params.getMessage)
+    multiplexer.send(targetId.ref, Print(targetId.ref, params.getMessage))
 
   override def onBuildLogMessage(params: LogMessageParams): Unit =
-    multiplexer(targetId.ref) = Print(targetId.ref, params.getMessage)
+    multiplexer.send(targetId.ref, Print(targetId.ref, params.getMessage))
 
   override def onBuildPublishDiagnostics(params: PublishDiagnosticsParams): Unit = {
     val targetId: TargetId = getTargetId(params.getBuildTarget.getUri)
@@ -294,9 +294,7 @@ class FuryBuildClient(multiplexer: Multiplexer[ModuleRef, CompileEvent], compila
         case _             => msg"${'['}${theme.info("H")}${']'}".string(theme)
       } }
 
-      multiplexer(targetId.ref) = DiagnosticMsg(
-        targetId.ref,
-        CompilerDiagnostic(
+      val diagnostic = DiagnosticMsg(targetId.ref, CompilerDiagnostic(
           msg"""$severity ${targetId.ref}${'>'}${repo}${':'}${filePath}${':'}${lineNo}${':'}${(charNum + 1).toString}
 ${'|'} ${UserMsg(
             theme =>
@@ -310,6 +308,8 @@ ${'|'} ${highlightedLine}
           charNum
         )
       )
+
+      multiplexer.send(targetId.ref, diagnostic)
     }
   }
 
@@ -333,15 +333,16 @@ ${'|'} ${highlightedLine}
   override def onBuildTaskProgress(params: TaskProgressParams): Unit = {
     val report   = convertDataTo[CompileTask](params.getData)
     val targetId = getTargetId(report.getTarget.getUri)
-    multiplexer(targetId.ref) = CompilationProgress(targetId.ref, params.getProgress.toDouble / params.getTotal)
+    multiplexer.send(targetId.ref,
+        CompilationProgress(targetId.ref, params.getProgress.toDouble / params.getTotal))
   }
 
   override def onBuildTaskStart(params: TaskStartParams): Unit = {
     val report   = convertDataTo[CompileTask](params.getData)
     val targetId: TargetId = getTargetId(report.getTarget.getUri)
-    multiplexer(targetId.ref) = StartCompile(targetId.ref)
+    multiplexer.send(targetId.ref, StartCompile(targetId.ref))
     compilation.deepDependencies(targetId).foreach { dependencyTargetId =>
-      multiplexer(dependencyTargetId.ref) = NoCompile(dependencyTargetId.ref)
+      multiplexer.send(dependencyTargetId.ref, NoCompile(dependencyTargetId.ref))
     }
   }
 
@@ -350,9 +351,9 @@ ${'|'} ${highlightedLine}
       val report = convertDataTo[CompileReport](params.getData)
       val targetId: TargetId = getTargetId(report.getTarget.getUri)
       val ref = targetId.ref
-      multiplexer(ref) = StopCompile(ref, params.getStatus == StatusCode.OK)
-      if(!compilation.targets(ref).kind.needsExecution) multiplexer(ref) = StopRun(ref)
-      else multiplexer(ref) = StartRun(ref)
+      multiplexer.send(ref, StopCompile(ref, params.getStatus == StatusCode.OK))
+      if(!compilation.targets(ref).kind.needsExecution) multiplexer.send(ref, StopRun(ref))
+      else multiplexer.send(ref, StartRun(ref))
   }
 }
 
@@ -560,7 +561,7 @@ case class Compilation(graph: Target.Graph,
 
     val future = dependencyFutures.map(CompileResult.merge).flatMap { required =>
       if(!required.isSuccessful) {
-        multiplexer(target.ref) = SkipCompile(target.ref)
+        multiplexer.send(target.ref, SkipCompile(target.ref))
         multiplexer.close(target.ref)
         Future.successful(required)
       } else {
@@ -568,7 +569,7 @@ case class Compilation(graph: Target.Graph,
 
         if(noCompilation) {
           deepDependencies(target.id).foreach { targetId =>
-            multiplexer(targetId.ref) = NoCompile(targetId.ref)
+            multiplexer.send(targetId.ref, NoCompile(targetId.ref))
           }
           Future.successful(required)
         } else compileModule(target, layout, multiplexer, pipelining, globalPolicy, args)
@@ -601,15 +602,15 @@ case class Compilation(graph: Target.Graph,
       layout = layout,
       args
     ) { ln =>
-      multiplexer(target.ref) = Print(target.ref, ln)
+      multiplexer.send(target.ref, Print(target.ref, ln))
     }.await()
 
     deepDependencies(target.id).foreach { targetId =>
-      multiplexer(targetId.ref) = NoCompile(targetId.ref)
+      multiplexer.send(targetId.ref, NoCompile(targetId.ref))
     }
 
     multiplexer.close(target.ref)
-    multiplexer(target.ref) = StopRun(target.ref)
+    multiplexer.send(target.ref, StopRun(target.ref))
 
     exitCode
   }

@@ -34,7 +34,8 @@ trait Repeater[Res]{
   def start(): Res = {
     val retries = Iterator.iterate[(Boolean, Res)](false -> action()) { case (stopped, prev) =>
       Thread.sleep(delayMillis)
-      if(!Thread.currentThread.isInterrupted && repeatCondition() && !stopped) false -> action() else stopped -> prev
+      if(!Thread.currentThread.isInterrupted && repeatCondition() && !stopped) false -> action()
+      else stopped -> prev
     }
     retries.dropWhile(!_._1).next()._2
   }
@@ -66,20 +67,18 @@ class SourceWatcher(sources: Set[Path]){
 
   def clear(): Unit = changed.set(false)
 
-  private[this] lazy val watchers = directories.map( src => new RecursiveFileMonitor(src) {
+  private[this] lazy val watchers = directories.map { src => new RecursiveFileMonitor(src) {
     override def onCreate(file: File, count: Int) = onChange(file)
     override def onModify(file: File, count: Int) = onChange(file)
     override def onDelete(file: File, count: Int) = onChange(file)
     override def start()(implicit ec: ExecutionContext) : Unit = {
       Future{ watcher.watch() }(ec)
     }
-  })
+  } }
 
   private[this] def onChange(file: File) = {
     val important: Boolean = file.extension.contains(".scala") || file.extension.contains(".java")
-    if(important){
-      changed.set(true)
-    }
+    if(important) changed.set(true)
   }
 
 }

@@ -233,7 +233,8 @@ object BuildCli {
       compilation  <- Compilation.syncCompilation(schema, module.ref(project), layout, https)
       r            =  repeater[Try[Future[CompileResult]]](compilation.allSources) { _: Unit =>
                          compileOnce(compilation, schema, module.ref(project), layout,
-                           globalPolicy, call.suffix, pipelining.getOrElse(ManagedConfig().pipelining),reporter, ManagedConfig().theme, https)
+                           globalPolicy, call.suffix, pipelining.getOrElse(ManagedConfig().pipelining),
+                           reporter, ManagedConfig().theme, https)
                       }
       future       <- if(watch) Try(r.start()).flatten else r.action()
     } yield {
@@ -303,11 +304,11 @@ object BuildCli {
             globalPolicy, call.suffix, pipelining.getOrElse(ManagedConfig().pipelining), reporter, ManagedConfig().theme, https)
         } yield {
           task.transform { completed =>
-            for{
+            for {
               compileResult  <- completed
               compileSuccess <- compileResult.asTry
               _              <- compilation.saveJars(module.ref(project), compileSuccess.classDirectories,
-                dir in layout.pwd, layout, fatJar)
+                                    dir in layout.pwd, layout, fatJar)
             } yield compileSuccess
           }
         }
@@ -319,12 +320,12 @@ object BuildCli {
     }
   }
 
-  private def repeater[T](sources: Set[Path])(f: Unit => T): Repeater[T] = new Repeater[T]{
+  private def repeater[T](sources: Set[Path])(f: Unit => T): Repeater[T] = new Repeater[T] {
     private val watcher = new SourceWatcher(sources)
     override def repeatCondition(): Boolean = watcher.hasChanges
 
     override def start(): T = {
-      try{
+      try {
         watcher.start()
         super.start()
       } catch {
@@ -334,6 +335,7 @@ object BuildCli {
         watcher.stop
       }
     }
+
     override def action(): T = {
       watcher.clear()
       f()
@@ -352,10 +354,8 @@ object BuildCli {
       optProject   <- ~optProjectId.flatMap(schema.projects.findBy(_).toOption)
       cli          <- cli.hint(ModuleArg, optProject.to[List].flatMap(_.modules))
       cli          <- cli.hint(ExecNameArg)
-      //cli          <- cli.hint(DirArg)
       call         <- cli.call()
       name         <- call(ExecNameArg)
-      //dir          <- call(DirArg)
       https        <- ~call(HttpsArg).isSuccess
       project      <- optProject.ascribe(UnspecifiedProject())
       optModuleId  <- ~call(ModuleArg).toOption.orElse(project.main)
@@ -492,7 +492,6 @@ object BuildCli {
       future
     }
   }
-
 }
 
 object LayerCli {
