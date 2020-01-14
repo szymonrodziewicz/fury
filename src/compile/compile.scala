@@ -69,6 +69,7 @@ object BloopServer {
   private def connect(dir: Path, multiplexer: Multiplexer[ModuleRef, CompileEvent],
       compilation: Compilation, targetId: TargetId, layout: Layout)(implicit log: Log): Future[Connection] =
     singleTasking { promise =>
+      log.info("Creating new connection")
       val serverIoPipe = Pipe.open()
       val serverIn = Channels.newInputStream(serverIoPipe.source())
       val clientOut = Channels.newOutputStream(serverIoPipe.sink())
@@ -155,6 +156,7 @@ object BloopServer {
           None
       }
     }.getOrElse(Await.result(connect(dir, multiplexer, compilation, targetId, layout), Duration.Inf))
+    log.info(s"Connection: ${System.identityHashCode(conn)}")
 
     try {
       val result = fn(conn)
