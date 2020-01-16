@@ -537,11 +537,12 @@ case class Compilation(graph: Target.Graph,
 
   def cleanCaches(target: Target,
                     layout: Layout,
-                    multiplexer: Multiplexer[ModuleRef, CompileEvent])(implicit log: Log)
+                    multiplexer: Multiplexer[ModuleRef, CompileEvent],
+                  bspTrace: Option[Path])(implicit log: Log)
   : Future[CleanCacheResult] = Future.fromTry {
     val uri: String = str"file:${layout.workDir(target.id).value}/?id=${target.id.key}"
     val params = new CleanCacheParams(List(new BuildTargetIdentifier(uri)).asJava)
-    BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout) { conn =>
+    BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout, bspTrace) { conn =>
       wrapServerErrors(conn.server.buildTargetCleanCache(params))
     }.flatten
   }
@@ -640,7 +641,7 @@ case class Compilation(graph: Target.Graph,
           }
           Future.successful(required)
         } else {
-          //cleanCaches(target, layout, multiplexer).flatMap{ result =>
+          //cleanCaches(target, layout, multiplexer, bspTrace).flatMap{ result =>
            // log.info(s"Clean cache returned ${result.toString}")
             compileModule(target, layout, multiplexer, pipelining, globalPolicy, args, bspTrace)
          // }
