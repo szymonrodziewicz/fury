@@ -538,19 +538,11 @@ case class Compilation(graph: Target.Graph,
   def cleanCaches(target: Target,
                     layout: Layout,
                     multiplexer: Multiplexer[ModuleRef, CompileEvent])(implicit log: Log)
-  : Future[Boolean] = Future.fromTry {
-    val uri: String = str"file://${layout.workDir(target.id).value}?id=${target.id.key}"
+  : Future[CleanCacheResult] = Future.fromTry {
+    val uri: String = str"file:${layout.workDir(target.id).value}/?id=${target.id.key}"
     val params = new CleanCacheParams(List(new BuildTargetIdentifier(uri)).asJava)
     BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout) { conn =>
-      val result: Try[CleanCacheResult] = {
-        for {
-          res <- wrapServerErrors(conn.server.buildTargetCleanCache(params))
-        } yield {
-          log.info(s"Clean cache returned ${res.toString}")
-          res
-        }
-      }
-      result.map(_.getCleaned.booleanValue)
+      wrapServerErrors(conn.server.buildTargetCleanCache(params))
     }.flatten
   }
 
@@ -563,25 +555,29 @@ case class Compilation(graph: Target.Graph,
                     bspTrace: Option[Path])(implicit log: Log)
   : Future[CompileResult] = Future.fromTry {
 
-    val uri: String = str"file://${layout.workDir(target.id).value}?id=${target.id.key}"
+    val uri: String = str"file:${layout.workDir(target.id).value}/?id=${target.id.key}"
     val params = new CompileParams(List(new BuildTargetIdentifier(uri)).asJava)
     if(pipelining) params.setArguments(List("--pipeline").asJava)
     val furyTargetIds = deepDependencies(target.id).toList
     
     val bspTargetIds = furyTargetIds.map { dep =>
-      new BuildTargetIdentifier(str"file://${layout.workDir(dep).value}?id=${dep.key}")
+      new BuildTargetIdentifier(str"file:${layout.workDir(dep).value}/?id=${dep.key}")
     }
     
     val bspToFury = (bspTargetIds zip furyTargetIds).toMap
     val scalacOptionsParams = new ScalacOptionsParams(bspTargetIds.asJava)
 
     BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout, bspTrace) { conn =>
-      
+      val x = System.currentTimeMillis()
+      log.info(s"$x Compile params ${params.toString}")
       val result: Try[CompileResult] = {
         for {
           res <- wrapServerErrors(conn.server.buildTargetCompile(params))
           opts <- wrapServerErrors(conn.server.buildTargetScalacOptions(scalacOptionsParams))
-        } yield CompileResult(res, opts)
+        } yield {
+          log.info(s"$x Compile result ${res.toString}")
+          CompileResult(res, opts)
+        }
       }
 
       result.get.scalacOptions.getItems.asScala.foreach { case soi =>
@@ -642,7 +638,8 @@ case class Compilation(graph: Target.Graph,
           }
           Future.successful(required)
         } else {
-          cleanCaches(target, layout, multiplexer).flatMap{ _ =>
+          cleanCaches(target, layout, multiplexer).flatMap{ result =>
+            log.info(s"Clean cache returned ${result.toString}")
             compileModule(target, layout, multiplexer, pipelining, globalPolicy, args, bspTrace)
           }
         }
