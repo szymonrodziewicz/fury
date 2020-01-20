@@ -557,14 +557,20 @@ case class Compilation(graph: Target.Graph,
     
     val bspToFury = (bspTargetIds zip furyTargetIds).toMap
     val scalacOptionsParams = new ScalacOptionsParams(bspTargetIds.asJava)
+    val cleanCacheParams = new CleanCacheParams(List(new BuildTargetIdentifier(uri)).asJava)
 
-    BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout) { conn =>
-      
+    BloopServer.borrow(layout.baseDir, multiplexer, this, target.id, layout, bspTrace) { conn =>
+      val x = System.currentTimeMillis()
+      log.info(s"$x Compile params ${params.toString}")
       val result: Try[CompileResult] = {
         for {
+          _ <- wrapServerErrors(conn.server.buildTargetCleanCache(cleanCacheParams))
           res <- wrapServerErrors(conn.server.buildTargetCompile(params))
           opts <- wrapServerErrors(conn.server.buildTargetScalacOptions(scalacOptionsParams))
-        } yield CompileResult(res, opts)
+        } yield {
+          log.info(s"$x Compile result ${res.toString}")
+          CompileResult(res, opts)
+        }
       }
 
       result.get.scalacOptions.getItems.asScala.foreach { case soi =>
