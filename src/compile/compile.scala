@@ -183,8 +183,8 @@ object BloopServer extends Lifecycle.Shutdown with Lifecycle.ResourceHolder {
     }
 
     Try {
+      acquire(Lifecycle.currentSession, conn)
       conn.synchronized{
-        acquire(Lifecycle.currentSession, conn)
         fn(conn)
       }
     }
