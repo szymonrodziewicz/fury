@@ -49,7 +49,7 @@ final class Multiplexer[K, V](keys: List[K]) {
 
   /** This method should only ever be called from one thread for any given reference, to
     *  guarantee safe concurrent access. */
-  def update(key: K, value: V): Unit = state(refs(key)) = value :: state(refs(key))
+  def update(key: K, value: V): Unit = if(refs.contains(key)) { state(refs(key)) = value :: state(refs(key)) }
 
   /** This method should only ever be called from one thread for any given reference, to
     *  guarantee safe concurrent access. */
