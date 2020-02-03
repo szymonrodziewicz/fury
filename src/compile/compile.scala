@@ -624,8 +624,11 @@ case class Compilation(graph: Target.Graph,
       result.get.scalacOptions.getItems.asScala.foreach { case soi =>
         val bti = soi.getTarget
         val classDir = soi.getClassDirectory
-        val targetId = bspToFury(bti)
-        val permanentClassesDir = layout.classesDir(targetId)
+        val responseTargetId = bspToFury(bti)
+        if(!furyTargetIds.contains(responseTargetId)){
+          log.warn(s"buildTarget/scalacOptions: Unexpected $responseTargetId")
+        }
+        val permanentClassesDir = layout.classesDir(responseTargetId)
         val temporaryClassesDir = Path(new URI(classDir))
         temporaryClassesDir.copyTo(permanentClassesDir)
         //TODO the method setClassDirectory modifies a mutable structure. Consider refactoring
