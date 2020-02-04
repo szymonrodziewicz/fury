@@ -627,12 +627,13 @@ case class Compilation(graph: Target.Graph,
         val responseTargetId = bspToFury(bti)
         if(!furyTargetIds.contains(responseTargetId)){
           log.warn(s"buildTarget/scalacOptions: Unexpected $responseTargetId")
+        } else {
+          val permanentClassesDir = layout.classesDir(responseTargetId)
+          val temporaryClassesDir = Path(new URI(classDir))
+          temporaryClassesDir.copyTo(permanentClassesDir)
+          //TODO the method setClassDirectory modifies a mutable structure. Consider refactoring
+          soi.setClassDirectory(permanentClassesDir.javaFile.toURI.toString)
         }
-        val permanentClassesDir = layout.classesDir(responseTargetId)
-        val temporaryClassesDir = Path(new URI(classDir))
-        temporaryClassesDir.copyTo(permanentClassesDir)
-        //TODO the method setClassDirectory modifies a mutable structure. Consider refactoring
-        soi.setClassDirectory(permanentClassesDir.javaFile.toURI.toString)
       }
 
       result.get
