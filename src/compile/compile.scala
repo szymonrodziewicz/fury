@@ -300,7 +300,7 @@ object Compilation {
 
 class FuryBuildClient(targetId: TargetId, layout: Layout) extends BuildClient {
 
-  private def broadcast(f: Multiplexer[ModuleRef, CompileEvent] => Unit): Unit = {
+  def broadcast(f: Multiplexer[ModuleRef, CompileEvent] => Unit): Unit = {
     BloopServer.subscribers(this).map(_.multiplexer).foreach(f)
   }
 
@@ -639,13 +639,15 @@ case class Compilation(graph: Target.Graph,
         soi.setClassDirectory(permanentClassesDir.javaFile.toURI.toString)
       }
 
-      result.get
+      (result.get, conn.client)
     }.map {
-      case compileResult if compileResult.isSuccessful && target.kind.needsExecution =>
+      case (compileResult, client) if compileResult.isSuccessful && target.kind.needsExecution =>
         val classDirectories = compileResult.classDirectories
+        client.broadcast(_(target.ref) = StartRun(target.ref))
         val exitCode = run(target, classDirectories, layout, globalPolicy, args, noSecurity)
+        client.broadcast(_(target.ref) = StopRun(target.ref))
         compileResult.copy(exitCode = Some(exitCode))
-      case otherResult =>
+      case (otherResult, _) =>
         otherResult
     }
   }
